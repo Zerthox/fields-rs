@@ -53,6 +53,9 @@
 
 pub use fields_macros::*;
 
+/// Concise access to a struct field type.
+pub type Field<T> = <T as Fields>::Field;
+
 /// A trait for dynamically accessing struct fields at runtime.
 pub trait Fields {
     /// Type representing individual fields with their values.
