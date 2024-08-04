@@ -45,7 +45,6 @@ impl Args {
         let doc = format!("A field of [`{parent}`].");
         quote! {
             #[doc = #doc]
-            #[automatically_derived]
             #[derive(#(#derives),*)]
         }
     }

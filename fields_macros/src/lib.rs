@@ -1,70 +1,27 @@
 mod args;
+mod input;
 
-use self::args::*;
-use attribute_derive::FromAttr;
-use heck::ToUpperCamelCase;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, DeriveInput, Field, Ident, Member};
+use self::{args::*, input::*};
+use quote::quote;
+use syn::{parse_macro_input, Member};
 
 /// Derive macro generating an impl of the `Fields` trait and an associated fields enum.
 #[proc_macro_derive(Fields, attributes(fields))]
 pub fn fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let DeriveInput {
-        attrs,
+    let Input {
+        args,
         vis,
-        ident: struct_ident,
+        parent,
         generics,
-        data,
-    } = parse_macro_input!(input as DeriveInput);
-
-    let fields = match data {
-        syn::Data::Struct(data) => data.fields,
-        syn::Data::Enum(data) => {
-            return syn::Error::new_spanned(&data.enum_token, "enum not supported by fields derive")
-                .into_compile_error()
-                .into()
-        }
-        syn::Data::Union(data) => {
-            return syn::Error::new_spanned(
-                &data.union_token,
-                "union not supported by fields derive",
-            )
-            .into_compile_error()
-            .into()
-        }
-    };
-
-    let args = match Args::from_attributes(&attrs) {
-        Ok(attr) => attr,
-        Err(err) => return err.to_compile_error().into(),
-    };
-    let enum_ident = args.name(&struct_ident);
-
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = fields
-        .iter()
-        .enumerate()
-        .filter(|(_, field)| args.filter(field))
-        .map(|(i, Field { ident, ty, .. })| {
-            let variant = match ident {
-                Some(ident) => Ident::new(&ident.to_string().to_upper_camel_case(), ident.span()),
-                None => format_ident!("Field{i}"),
-            };
-            let field = match ident {
-                Some(ident) => Member::Named(ident.clone()),
-                None => Member::Unnamed(i.into()),
-            };
-            (field, variant, ty)
-        })
-        .collect::<Vec<_>>();
+        fields,
+    } = parse_macro_input!(input as Input);
 
     let variants = fields.iter().map(|(field, variant, ty)| {
         let field = match field {
             Member::Named(field) => field.to_string(),
             Member::Unnamed(unnamed) => unnamed.index.to_string(),
         };
-        let doc = format!("Field [`{field}`]({struct_ident}::{field}) of [`{struct_ident}`].",);
+        let doc = format!("Field [`{field}`]({parent}::{field}) of [`{parent}`].",);
         quote! {
             #[doc = #doc]
             #variant(#ty)
@@ -75,15 +32,19 @@ pub fn fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         quote! { Self::Field::#variant(value) => self.#field = value }
     });
 
-    let attributes = args.attributes(&struct_ident);
+    let attributes = args.attributes(&parent);
+    let enum_ident = args.name(&parent);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     quote! {
+        #[automatically_derived]
         #attributes
         #vis enum #enum_ident #ty_generics #where_clause {
             #(#variants),*
         }
 
         #[automatically_derived]
-        impl #impl_generics ::fields::Fields for #struct_ident #ty_generics #where_clause {
+        impl #impl_generics ::fields::Fields for #parent #ty_generics #where_clause {
             type Field = #enum_ident #ty_generics;
 
             #[inline]
@@ -91,6 +52,33 @@ pub fn fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 match field {
                     #(#sets),*
                 }
+            }
+        }
+    }
+    .into()
+}
+
+/// Derive macro generating an impl of the `AllFields` trait.
+#[proc_macro_derive(AllFields, attributes(fields))]
+pub fn all_fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let Input {
+        parent,
+        generics,
+        fields,
+        ..
+    } = parse_macro_input!(input as Input);
+
+    let all = fields.iter().map(|(field, variant, _)| {
+        quote! { Self::Field::#variant(::core::clone::Clone::clone(&self.#field)) }
+    });
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        #[automatically_derived]
+        impl #impl_generics ::fields::AllFields for #parent #ty_generics #where_clause {
+            fn all(&self) -> impl ::core::iter::Iterator<Item = Self::Field> + 'static {
+                [ #(#all),* ].into_iter()
             }
         }
     }

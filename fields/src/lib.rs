@@ -51,9 +51,9 @@
 //! }
 //! ```
 
-pub use fields_macros::Fields;
+pub use fields_macros::*;
 
-/// A trait for dynamically accessing a struct fields at runtime.
+/// A trait for dynamically accessing struct fields at runtime.
 pub trait Fields {
     /// Type representing individual fields with their values.
     type Field;
@@ -68,4 +68,13 @@ pub trait Fields {
             self.set(field);
         }
     }
+}
+
+/// A trait for dynamically accessing all struct fields at runtime.
+pub trait AllFields: Fields
+where
+    Self::Field: Clone,
+{
+    /// Returns the current values of all fields.
+    fn all(&self) -> impl Iterator<Item = Self::Field> + 'static;
 }

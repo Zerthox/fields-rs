@@ -1,4 +1,4 @@
-use fields::Fields;
+use fields::{AllFields, Fields};
 
 #[test]
 fn simple() {
@@ -30,7 +30,7 @@ fn generic() {
     #[derive(Debug, Clone, PartialEq, Fields)]
     struct Generic<'a, S, T>
     where
-        S: Into<String>,
+        S: Clone + Into<String>,
     {
         name: S,
         value: &'a T,
@@ -89,4 +89,21 @@ fn derives() {
     let field = TestField::Name("foo".into());
     let cloned = field.clone();
     assert_eq!(field, cloned);
+}
+
+#[test]
+fn all() {
+    #[derive(Debug, Default, Fields, AllFields)]
+    #[fields(derive(Debug, Clone, PartialEq))]
+    struct Test {
+        valid: bool,
+        id: u32,
+        name: String,
+    }
+
+    let test = Test::default();
+    let all = test.all().collect::<Vec<_>>();
+    assert!(all.iter().any(|field| matches!(field, TestField::Valid(_))));
+    assert!(all.iter().any(|field| matches!(field, TestField::Id(_))));
+    assert!(all.iter().any(|field| matches!(field, TestField::Name(_))));
 }
