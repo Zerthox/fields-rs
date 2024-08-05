@@ -61,6 +61,9 @@ pub trait Fields {
     /// Type representing individual fields with their values.
     type Field;
 
+    /// Turns the type into an iterator over all field values.
+    fn into_all(self) -> impl Iterator<Item = Self::Field>;
+
     /// Sets the value of the individual given field.
     fn set(&mut self, field: Self::Field);
 
@@ -71,13 +74,4 @@ pub trait Fields {
             self.set(field);
         }
     }
-}
-
-/// A trait for dynamically accessing all struct fields at runtime.
-pub trait AllFields: Fields
-where
-    Self::Field: Clone,
-{
-    /// Returns the current values of all fields.
-    fn all(&self) -> impl Iterator<Item = Self::Field> + 'static;
 }

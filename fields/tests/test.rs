@@ -1,4 +1,4 @@
-use fields::{AllFields, Fields};
+use fields::Fields;
 
 #[test]
 fn simple() {
@@ -93,7 +93,7 @@ fn derives() {
 
 #[test]
 fn all() {
-    #[derive(Debug, Default, Fields, AllFields)]
+    #[derive(Debug, Default, Fields)]
     #[fields(derive(Debug, Clone, PartialEq))]
     struct Test {
         valid: bool,
@@ -102,7 +102,7 @@ fn all() {
     }
 
     let test = Test::default();
-    let all = test.all().collect::<Vec<_>>();
+    let all = test.into_all().collect::<Vec<_>>();
     assert!(all.iter().any(|field| matches!(field, TestField::Valid(_))));
     assert!(all.iter().any(|field| matches!(field, TestField::Id(_))));
     assert!(all.iter().any(|field| matches!(field, TestField::Name(_))));

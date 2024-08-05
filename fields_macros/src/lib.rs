@@ -28,6 +28,10 @@ pub fn fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     });
 
+    let all = fields.iter().map(|(field, variant, _)| {
+        quote! { Self::Field::#variant(self.#field) }
+    });
+
     let sets = fields.iter().map(|(field, variant, _)| {
         quote! { Self::Field::#variant(value) => self.#field = value }
     });
@@ -47,38 +51,15 @@ pub fn fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         impl #impl_generics ::fields::Fields for #parent #ty_generics #where_clause {
             type Field = #enum_ident #ty_generics;
 
+            fn into_all(self) -> impl ::core::iter::Iterator<Item = Self::Field> {
+                [ #(#all),* ].into_iter()
+            }
+
             #[inline]
             fn set(&mut self, field: Self::Field) {
                 match field {
                     #(#sets),*
                 }
-            }
-        }
-    }
-    .into()
-}
-
-/// Derive macro generating an impl of the `AllFields` trait.
-#[proc_macro_derive(AllFields, attributes(fields))]
-pub fn all_fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let Input {
-        parent,
-        generics,
-        fields,
-        ..
-    } = parse_macro_input!(input as Input);
-
-    let all = fields.iter().map(|(field, variant, _)| {
-        quote! { Self::Field::#variant(::core::clone::Clone::clone(&self.#field)) }
-    });
-
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    quote! {
-        #[automatically_derived]
-        impl #impl_generics ::fields::AllFields for #parent #ty_generics #where_clause {
-            fn all(&self) -> impl ::core::iter::Iterator<Item = Self::Field> + 'static {
-                [ #(#all),* ].into_iter()
             }
         }
     }

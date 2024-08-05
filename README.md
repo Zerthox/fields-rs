@@ -1,6 +1,8 @@
+# Fields
+
 Interface and macros for dynamically accessing struct fields at runtime.
 
-# Usage
+## Usage
 ```rs
 use fields::Fields;
 
