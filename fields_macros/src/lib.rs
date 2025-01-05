@@ -16,25 +16,55 @@ pub fn fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         fields,
     } = parse_macro_input!(input as Input);
 
-    let variants = fields.iter().map(|(field, variant, ty)| {
-        let field = match field {
-            Member::Named(field) => field.to_string(),
-            Member::Unnamed(unnamed) => unnamed.index.to_string(),
-        };
-        let doc = format!("Field [`{field}`]({parent}::{field}) of [`{parent}`].",);
-        quote! {
-            #[doc = #doc]
-            #variant(#ty)
-        }
-    });
+    let variants = fields.iter().map(
+        |Field {
+             member,
+             variant,
+             ty,
+             ..
+         }| {
+            let field = match member {
+                Member::Named(field) => field.to_string(),
+                Member::Unnamed(unnamed) => unnamed.index.to_string(),
+            };
+            let doc = format!("Field [`{field}`]({parent}::{field}) of [`{parent}`].",);
+            quote! {
+                #[doc = #doc]
+                #variant(#ty)
+            }
+        },
+    );
 
-    let all = fields.iter().map(|(field, variant, _)| {
-        quote! { Self::Field::#variant(self.#field) }
-    });
+    let all_normal = fields.iter().filter(|field| !field.flatten).map(
+        |Field {
+             member, variant, ..
+         }| {
+            quote! { Self::Field::#variant(self.#member) }
+        },
+    );
 
-    let sets = fields.iter().map(|(field, variant, _)| {
-        quote! { Self::Field::#variant(value) => self.#field = value }
-    });
+    let all_flattened = fields.iter().filter(|field| field.flatten).map(
+        |Field {
+             member, variant, ..
+         }| {
+            quote! { .chain(::fields::Fields::into_all(self.#member).map(Self::Field::#variant)) }
+        },
+    );
+
+    let sets = fields.iter().map(
+        |Field {
+             flatten,
+             member,
+             variant,
+             ..
+         }| {
+            if *flatten {
+                quote! { Self::Field::#variant(value) => ::fields::Fields::set(&mut self.#member, value) }
+            } else {
+                quote! { Self::Field::#variant(value) => self.#member = value }
+            }
+        },
+    );
 
     let attributes = args.attributes(&parent);
     let enum_ident = args.name(&parent);
@@ -52,7 +82,7 @@ pub fn fields(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             type Field = #enum_ident #ty_generics;
 
             fn into_all(self) -> impl ::core::iter::Iterator<Item = Self::Field> {
-                [ #(#all),* ].into_iter()
+                [ #(#all_normal),* ].into_iter() #(#all_flattened)*
             }
 
             #[inline]

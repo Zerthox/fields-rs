@@ -1,15 +1,22 @@
-use crate::Args;
+use crate::{FieldArgs, StructArgs};
 use attribute_derive::FromAttr;
 use heck::ToUpperCamelCase;
-use quote::format_ident;
-use syn::{parse::ParseStream, DeriveInput, Field, Generics, Ident, Member, Type, Visibility};
+use quote::{format_ident, quote};
+use syn::{parse::ParseStream, DeriveInput, Generics, Ident, Member, Type, Visibility};
 
 pub struct Input {
-    pub args: Args,
+    pub args: StructArgs,
     pub vis: Visibility,
     pub parent: Ident,
     pub generics: Generics,
-    pub fields: Vec<(Member, Ident, Type)>,
+    pub fields: Vec<Field>,
+}
+
+pub struct Field {
+    pub flatten: bool,
+    pub member: Member,
+    pub variant: Ident,
+    pub ty: Type,
 }
 
 impl syn::parse::Parse for Input {
@@ -38,26 +45,43 @@ impl syn::parse::Parse for Input {
             }
         };
 
-        let args = Args::from_attributes(&attrs)?;
+        let args = StructArgs::from_attributes(&attrs)?;
 
         let fields = fields
             .iter()
             .enumerate()
             .filter(|(_, field)| args.filter(field))
-            .map(|(i, Field { ident, ty, .. })| {
-                let variant = match ident {
-                    Some(ident) => {
-                        Ident::new(&ident.to_string().to_upper_camel_case(), ident.span())
-                    }
-                    None => format_ident!("Field{i}"),
-                };
-                let field = match ident {
-                    Some(ident) => Member::Named(ident.clone()),
-                    None => Member::Unnamed(i.into()),
-                };
-                (field, variant, ty.clone())
-            })
-            .collect::<Vec<_>>();
+            .map(
+                |(
+                    i,
+                    syn::Field {
+                        attrs, ident, ty, ..
+                    },
+                )| {
+                    let FieldArgs { flatten } = FieldArgs::from_attributes(attrs)?;
+                    let variant = match ident {
+                        Some(ident) => {
+                            Ident::new(&ident.to_string().to_upper_camel_case(), ident.span())
+                        }
+                        None => format_ident!("Field{i}"),
+                    };
+                    let member = match ident {
+                        Some(ident) => Member::Named(ident.clone()),
+                        None => Member::Unnamed(i.into()),
+                    };
+                    Ok(Field {
+                        flatten,
+                        member,
+                        variant,
+                        ty: if flatten {
+                            Type::Verbatim(quote! { ::fields::Field::<#ty> })
+                        } else {
+                            ty.clone()
+                        },
+                    })
+                },
+            )
+            .collect::<syn::Result<Vec<_>>>()?;
 
         Ok(Input {
             args,

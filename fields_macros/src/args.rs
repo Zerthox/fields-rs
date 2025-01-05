@@ -8,7 +8,7 @@ use syn::{spanned::Spanned, Field, Ident, Path, Token, VisRestricted, Visibility
 
 #[derive(FromAttr)]
 #[attribute(ident = fields)]
-pub struct Args {
+pub struct StructArgs {
     name: Option<String>,
 
     #[attribute(optional)]
@@ -18,7 +18,7 @@ pub struct Args {
     visibility: Vec<Vis>,
 }
 
-impl Args {
+impl StructArgs {
     pub fn name(&self, parent: &Ident) -> Ident {
         self.name
             .as_ref()
@@ -87,3 +87,9 @@ impl AttributeValue for Vis {
 }
 
 impl PositionalValue for Vis {}
+
+#[derive(FromAttr)]
+#[attribute(ident = fields)]
+pub struct FieldArgs {
+    pub flatten: bool,
+}

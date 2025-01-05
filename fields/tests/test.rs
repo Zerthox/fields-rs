@@ -82,6 +82,7 @@ fn attributes() {
 fn derives() {
     #[derive(Debug, Default, Fields)]
     #[fields(derive(Debug, Clone, PartialEq))]
+    #[allow(unused)]
     struct Test {
         name: String,
     }
@@ -106,4 +107,38 @@ fn all() {
     assert!(all.iter().any(|field| matches!(field, TestField::Valid(_))));
     assert!(all.iter().any(|field| matches!(field, TestField::Id(_))));
     assert!(all.iter().any(|field| matches!(field, TestField::Name(_))));
+}
+
+#[test]
+fn flatten() {
+    #[derive(Debug, Default, Clone, Fields)]
+    #[fields(derive(Debug, Clone, PartialEq))]
+    struct Inner {
+        valid: bool,
+        id: u32,
+        name: String,
+    }
+
+    #[derive(Debug, Default, Clone, Fields)]
+    #[fields(derive(Debug, Clone))]
+    struct Outer {
+        #[fields(flatten)]
+        inner: Inner,
+        primitive: u32,
+    }
+
+    let outer = Outer::default();
+    let all = outer.into_all().collect::<Vec<_>>();
+    assert!(all
+        .iter()
+        .any(|field| matches!(field, OuterField::Inner(InnerField::Valid(_)))));
+    assert!(all
+        .iter()
+        .any(|field| matches!(field, OuterField::Inner(InnerField::Id(_)))));
+    assert!(all
+        .iter()
+        .any(|field| matches!(field, OuterField::Inner(InnerField::Name(_)))));
+    assert!(all
+        .iter()
+        .any(|field| matches!(field, OuterField::Primitive(_))));
 }

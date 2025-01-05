@@ -50,6 +50,27 @@
 //!     name: String,
 //! }
 //! ```
+//!
+//! Nested structs implementing the [`Fields`] trait can be flattened in the generated fields enum:
+//! ```no_run
+//! # use fields::Fields;
+//! #[derive(Default, Fields)]
+//! struct Inner {
+//!     valid: bool,
+//!     id: u32,
+//!     name: String,
+//! }
+//!
+//! #[derive(Default, Fields)]
+//! struct Outer {
+//!     #[fields(flatten)]
+//!     inner: Inner,
+//!     primitive: i32,
+//! }
+//!
+//! let mut outer = Outer::default();
+//! outer.set(OuterField::Inner(InnerField::Valid(true)));
+//! ```
 
 pub use fields_macros::*;
 
